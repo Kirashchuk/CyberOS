@@ -1,0 +1,8 @@
+﻿node_modules/
+dist/
+.vscode/
+.DS_Store
+*.log
+vault/
+cyberos.config.json
+.env

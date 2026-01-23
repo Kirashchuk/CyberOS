@@ -1,0 +1,12 @@
+﻿{
+  "name": "cyber-os",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "test": "bun test",
+    "lint": "bun run tools/lint.ts",
+    "format": "bun run tools/format.ts"
+  }
+}
