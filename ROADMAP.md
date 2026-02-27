@@ -6,9 +6,9 @@
 - [x] Repo standards: AGENTS, ARCHITECTURE, ROADMAP, SECURITY
 
 ## Phase 1 - Indexer + Evidence model
-- [ ] Fact schema and sqlite tables
-- [ ] Markdown parser with source refs
-- [ ] `/search` with citations
+- [x] Fact schema and sqlite tables
+- [x] Markdown parser with source refs
+- [x] `/search` with citations
 
 ## Phase 2 - MCP integration layer
 - [ ] MCP client support and connector registry

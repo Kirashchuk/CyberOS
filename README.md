@@ -13,9 +13,14 @@ bun install
 bun run dev -- /init --vault <path>
 ```
 
-3) Reindex (Phase 0 placeholder):
+3) Reindex (build facts index from markdown sources):
 ```
 bun run dev -- /reindex
+```
+
+4) Search indexed facts (with source citations):
+```
+bun run dev -- /search --q "your query"
 ```
 
 ## Notes

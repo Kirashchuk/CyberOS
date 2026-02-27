@@ -1,8 +1,9 @@
-﻿import { resolve } from "node:path";
+import { resolve } from "node:path";
 import { loadConfig, saveConfig } from "./kernel/config";
 import { ensureVaultStructure, validateVaultStructure } from "./kernel/vault";
 import { runReindex } from "./kernel/reindex";
 import { writeRunLog } from "./kernel/logging";
+import { searchFacts } from "./kernel/indexer";
 
 type ParsedArgs = {
   command: string | null;
@@ -61,6 +62,7 @@ function usage(): string {
     "Usage:",
     "  /init --vault <path>",
     "  /reindex",
+    "  /search --q <query> [--limit <n>]",
     "  /help",
     "",
     "Notes:",
@@ -103,7 +105,48 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     await runReindex(vaultPath);
-    console.log("Reindex complete (empty placeholder state)." );
+    console.log("Reindex complete.");
+    return;
+  }
+
+  if (normalized === "search") {
+    const vaultPath = await resolveVaultPath(options);
+    if (!vaultPath) {
+      console.error("Missing vault path. Use --vault <path> or set CYBEROS_VAULT.");
+      process.exit(1);
+    }
+    const check = validateVaultStructure(vaultPath);
+    if (check.missingDirs.length > 0) {
+      console.error(`Vault is missing: ${check.missingDirs.join(", ")}. Run /init first.`);
+      process.exit(1);
+    }
+
+    if (typeof options.q !== "string" || options.q.trim().length === 0) {
+      console.error("Missing query. Use /search --q <query>.");
+      process.exit(1);
+    }
+
+    const limit = typeof options.limit === "string" ? Number(options.limit) : 20;
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 20;
+    const query = options.q.trim();
+
+    const results = await searchFacts(vaultPath, query, safeLimit);
+
+    if (results.length === 0) {
+      console.log("No facts found.");
+    } else {
+      for (const row of results) {
+        console.log(`- ${row.statement}`);
+        console.log(`  source_ref: ${row.sourceRef}`);
+      }
+    }
+
+    await writeRunLog(vaultPath, "search", "ok", [
+      `Query: ${query}`,
+      `Limit: ${safeLimit}`,
+      `Results: ${results.length}`
+    ]);
+
     return;
   }
 
