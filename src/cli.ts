@@ -3,6 +3,8 @@ import { loadConfig, saveConfig } from "./kernel/config";
 import { ensureVaultStructure, validateVaultStructure } from "./kernel/vault";
 import { runReindex } from "./kernel/reindex";
 import { writeRunLog } from "./kernel/logging";
+import { ingestArchive, ingestGateway, rebuildAggregates } from "./kernel/ingestion";
+import { startPublicApi } from "./kernel/publicApi";
 
 type ParsedArgs = {
   command: string | null;
@@ -61,6 +63,10 @@ function usage(): string {
     "Usage:",
     "  /init --vault <path>",
     "  /reindex",
+    "  /ingest-archive",
+    "  /ingest-gateway",
+    "  /refresh-aggregates",
+    "  /serve-public --port <port>",
     "  /help",
     "",
     "Notes:",
@@ -104,6 +110,51 @@ async function main(): Promise<void> {
     }
     await runReindex(vaultPath);
     console.log("Reindex complete (empty placeholder state)." );
+    return;
+  }
+
+  if (normalized === "ingest-archive") {
+    const vaultPath = await resolveVaultPath(options);
+    if (!vaultPath) {
+      console.error("Missing vault path. Use --vault <path> or set CYBEROS_VAULT.");
+      process.exit(1);
+    }
+    const summary = await ingestArchive(vaultPath);
+    console.log(`Archive ingestion done. files=${summary.files}, snapshots=${summary.snapshots}, orderHistory=${summary.orderHistory}, matchHistory=${summary.matchHistory}`);
+    return;
+  }
+
+  if (normalized === "ingest-gateway") {
+    const vaultPath = await resolveVaultPath(options);
+    if (!vaultPath) {
+      console.error("Missing vault path. Use --vault <path> or set CYBEROS_VAULT.");
+      process.exit(1);
+    }
+    const summary = await ingestGateway(vaultPath);
+    console.log(`Gateway ingestion done. files=${summary.files}, intents=${summary.intents}, executions=${summary.executions}`);
+    return;
+  }
+
+  if (normalized === "refresh-aggregates") {
+    const vaultPath = await resolveVaultPath(options);
+    if (!vaultPath) {
+      console.error("Missing vault path. Use --vault <path> or set CYBEROS_VAULT.");
+      process.exit(1);
+    }
+    await rebuildAggregates(vaultPath);
+    console.log("Aggregates refreshed.");
+    return;
+  }
+
+  if (normalized === "serve-public") {
+    const vaultPath = await resolveVaultPath(options);
+    if (!vaultPath) {
+      console.error("Missing vault path. Use --vault <path> or set CYBEROS_VAULT.");
+      process.exit(1);
+    }
+    const port = typeof options.port === "string" ? Number(options.port) : 3000;
+    await writeRunLog(vaultPath, "serve-public", "ok", [`port=${port}`]);
+    await startPublicApi(vaultPath, Number.isFinite(port) ? port : 3000);
     return;
   }
 
