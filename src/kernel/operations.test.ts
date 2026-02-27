@@ -47,7 +47,7 @@ describe("metrics and alerts", () => {
     const metrics = buildMetrics(
       [
         { ok: true, errorCode: null, source_ref: "x" },
-        { ok: false, errorCode: "builder_validation", source_ref: "x" },
+        { ok: false, errorCode: "InvalidBuilder", source_ref: "x" },
         { ok: false, errorCode: "gateway_timeout", source_ref: "x" },
         { ok: false, errorCode: "gateway_timeout", source_ref: "x" }
       ],

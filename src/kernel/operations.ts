@@ -176,12 +176,12 @@ export function detectAlerts(metrics: ReindexMetrics): Alert[] {
     });
   }
 
-  if ((metrics.execute.failByErrorCode.builder_validation ?? 0) > 0) {
+  if ((metrics.execute.failByErrorCode.builder_validation ?? 0) > 0 || (metrics.execute.failByErrorCode.InvalidBuilder ?? 0) > 0) {
     alerts.push({
       severity: "critical",
       code: "builder_validation_failures",
       message: "Builder validation failures detected in execute stage",
-      source_ref: "metrics.execute.failByErrorCode.builder_validation"
+      source_ref: "metrics.execute.failByErrorCode.InvalidBuilder"
     });
   }
 

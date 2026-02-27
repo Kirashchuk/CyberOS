@@ -11,6 +11,7 @@ import {
   type ExecuteResult,
   type MaintenanceWindow
 } from "./operations";
+import { submitOrder } from "../trading/order_submitter";
 
 const MAINTENANCE_WINDOWS: MaintenanceWindow[] = [
   { dayOfWeek: 0, startHourUtc: 2, endHourUtc: 4 }
@@ -25,9 +26,33 @@ export async function runReindex(vaultPath: string): Promise<void> {
   const now = new Date();
   const pausedForMaintenance = isMaintenanceWindow(now, MAINTENANCE_WINDOWS);
 
+  const backendPolicy = {
+    builderFeeMode: "fail_closed" as const
+  };
+
+  const manualSubmit = submitOrder({
+    venue: "manual_trading",
+    orderFlags: 5,
+    builder: "42",
+    builderFeeRate: 15,
+    policy: backendPolicy
+  });
+
+  const copySubmit = submitOrder({
+    venue: "copy_engine",
+    orderFlags: 9,
+    builder: "invalid-builder-id",
+    builderFeeRate: 12,
+    policy: backendPolicy
+  });
+
   const executeResults: ExecuteResult[] = [
-    { ok: true, errorCode: null, source_ref: "execute#1" },
-    { ok: false, errorCode: "builder_validation", source_ref: "execute#2" },
+    { ok: manualSubmit.ok, errorCode: manualSubmit.errorCode, source_ref: manualSubmit.source_ref },
+    {
+      ok: copySubmit.ok,
+      errorCode: copySubmit.errorCode,
+      source_ref: copySubmit.source_ref
+    },
     { ok: false, errorCode: "gateway_timeout", source_ref: "execute#3" },
     { ok: false, errorCode: "gateway_timeout", source_ref: "execute#4" }
   ];
@@ -90,6 +115,32 @@ export async function runReindex(vaultPath: string): Promise<void> {
       attributes: {
         pausedForMaintenance,
         breakerState: breaker.snapshot().state
+      }
+    },
+    {
+      level: manualSubmit.ok ? "info" : "warn",
+      event: "manual_trading.submit",
+      message: manualSubmit.ok ? "Manual trading order submitted" : "Manual trading order submission failed",
+      source_ref: manualSubmit.source_ref,
+      attributes: {
+        digest: manualSubmit.audit.digest,
+        appendix: manualSubmit.audit.appendix,
+        builder_id: manualSubmit.audit.builder_id,
+        builder_fee_rate: manualSubmit.audit.builder_fee_rate,
+        builder_fee_mode: backendPolicy.builderFeeMode
+      }
+    },
+    {
+      level: copySubmit.ok ? "info" : "warn",
+      event: "copy_engine.submit",
+      message: copySubmit.ok ? "Copy engine order submitted" : "Copy engine order submission failed",
+      source_ref: copySubmit.source_ref,
+      attributes: {
+        digest: copySubmit.audit.digest,
+        appendix: copySubmit.audit.appendix,
+        builder_id: copySubmit.audit.builder_id,
+        builder_fee_rate: copySubmit.audit.builder_fee_rate,
+        builder_fee_mode: backendPolicy.builderFeeMode
       }
     },
     {
