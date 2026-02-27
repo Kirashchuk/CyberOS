@@ -70,19 +70,23 @@ async function requireVault(options: Record<string, string | boolean>): Promise<
   return vaultPath;
 }
 
+const COMMAND_USAGE = [
+  "/init --vault <path>",
+  "/reindex",
+  "/search --q <query> [--limit <n>]",
+  "/ingest-archive",
+  "/ingest-gateway",
+  "/refresh-aggregates",
+  "/serve-public --port <n>",
+  "/help"
+] as const;
+
 function usage(): string {
   return [
     "Cyber OS CLI",
     "",
     "Usage:",
-    "  /init --vault <path>",
-    "  /reindex",
-    "  /search --q <query> [--limit <n>]",
-    "  /ingest-archive",
-    "  /ingest-gateway",
-    "  /refresh-aggregates",
-    "  /serve-public --port <n>",
-    "  /help",
+    ...COMMAND_USAGE.map((entry) => `  ${entry}`),
     "",
     "Notes:",
     "  - Set CYBEROS_VAULT or pass --vault to select a vault.",
