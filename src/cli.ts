@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import { resolve, join } from "node:path";
 import { loadConfig, saveConfig } from "./kernel/config";
 import { ensureVaultStructure, validateVaultStructure } from "./kernel/vault";
 import { runReindex } from "./kernel/reindex";
@@ -55,6 +56,20 @@ async function resolveVaultPath(options: Record<string, string | boolean>): Prom
   return null;
 }
 
+async function requireVault(options: Record<string, string | boolean>): Promise<string> {
+  const vaultPath = await resolveVaultPath(options);
+  if (!vaultPath) {
+    console.error("Missing vault path. Use --vault <path> or set CYBEROS_VAULT.");
+    process.exit(1);
+  }
+  const check = validateVaultStructure(vaultPath);
+  if (check.missingDirs.length > 0) {
+    console.error(`Vault is missing: ${check.missingDirs.join(", ")}. Run /init first.`);
+    process.exit(1);
+  }
+  return vaultPath;
+}
+
 function usage(): string {
   return [
     "Cyber OS CLI",
@@ -63,6 +78,10 @@ function usage(): string {
     "  /init --vault <path>",
     "  /reindex",
     "  /search --q <query> [--limit <n>]",
+    "  /ingest-archive",
+    "  /ingest-gateway",
+    "  /refresh-aggregates",
+    "  /serve-public --port <n>",
     "  /help",
     "",
     "Notes:",
@@ -94,32 +113,14 @@ async function main(): Promise<void> {
   }
 
   if (normalized === "reindex") {
-    const vaultPath = await resolveVaultPath(options);
-    if (!vaultPath) {
-      console.error("Missing vault path. Use --vault <path> or set CYBEROS_VAULT.");
-      process.exit(1);
-    }
-    const check = validateVaultStructure(vaultPath);
-    if (check.missingDirs.length > 0) {
-      console.error(`Vault is missing: ${check.missingDirs.join(", ")}. Run /init first.`);
-      process.exit(1);
-    }
+    const vaultPath = await requireVault(options);
     await runReindex(vaultPath);
     console.log("Reindex complete.");
     return;
   }
 
   if (normalized === "search") {
-    const vaultPath = await resolveVaultPath(options);
-    if (!vaultPath) {
-      console.error("Missing vault path. Use --vault <path> or set CYBEROS_VAULT.");
-      process.exit(1);
-    }
-    const check = validateVaultStructure(vaultPath);
-    if (check.missingDirs.length > 0) {
-      console.error(`Vault is missing: ${check.missingDirs.join(", ")}. Run /init first.`);
-      process.exit(1);
-    }
+    const vaultPath = await requireVault(options);
 
     if (typeof options.q !== "string" || options.q.trim().length === 0) {
       console.error("Missing query. Use /search --q <query>.");
@@ -147,6 +148,80 @@ async function main(): Promise<void> {
       `Results: ${results.length}`
     ]);
 
+    return;
+  }
+
+  if (normalized === "ingest-archive" || normalized === "ingest-gateway") {
+    const vaultPath = await requireVault(options);
+    const indexDir = join(vaultPath, "index");
+    await mkdir(indexDir, { recursive: true });
+    const outputPath = join(indexDir, `${normalized}.json`);
+    await writeFile(
+      outputPath,
+      JSON.stringify(
+        {
+          status: "placeholder",
+          command: normalized,
+          completedAt: new Date().toISOString(),
+          source_ref: `cli:${normalized}`
+        },
+        null,
+        2
+      ) + "\n",
+      "utf8"
+    );
+
+    await writeRunLog(vaultPath, normalized, "ok", [
+      "Placeholder ingest completed",
+      `Output: ${outputPath}`,
+      "source_ref: cli:ingest"
+    ]);
+    console.log(`${normalized} complete (placeholder).`);
+    return;
+  }
+
+  if (normalized === "refresh-aggregates") {
+    const vaultPath = await requireVault(options);
+    const indexDir = join(vaultPath, "index");
+    await mkdir(indexDir, { recursive: true });
+    const outputPath = join(indexDir, "aggregates.json");
+    await writeFile(
+      outputPath,
+      JSON.stringify(
+        {
+          status: "placeholder",
+          refreshedAt: new Date().toISOString(),
+          source_ref: "cli:refresh-aggregates"
+        },
+        null,
+        2
+      ) + "\n",
+      "utf8"
+    );
+
+    await writeRunLog(vaultPath, "refresh-aggregates", "ok", [
+      "Placeholder aggregate refresh completed",
+      `Output: ${outputPath}`,
+      "source_ref: cli:refresh-aggregates"
+    ]);
+    console.log("refresh-aggregates complete (placeholder).");
+    return;
+  }
+
+  if (normalized === "serve-public") {
+    const vaultPath = await requireVault(options);
+    const port = typeof options.port === "string" ? Number(options.port) : 3000;
+    const safePort = Number.isFinite(port) && port > 0 ? Math.floor(port) : 3000;
+
+    await writeRunLog(vaultPath, "serve-public", "ok", [
+      `Port: ${safePort}`,
+      "Placeholder public endpoints announced",
+      "source_ref: cli:serve-public"
+    ]);
+
+    console.log(`Serving public endpoints (placeholder) on :${safePort}`);
+    console.log("- GET /public/scanner?limit=50");
+    console.log("- GET /public/leaderboard?minPnL=0&minVolume=100000&minTrades=10&limit=100&offset=0");
     return;
   }
 
